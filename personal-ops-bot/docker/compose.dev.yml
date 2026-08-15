@@ -1,0 +1,32 @@
+# Local development stack. Only PostgreSQL runs here; the api and worker run on
+# the host so you get a fast edit-reload loop and a working debugger.
+#
+# The image is pgvector/pgvector:pg16, not postgres:16, even though vectors are
+# not used until M4. Swapping the image later means recreating the volume or
+# installing an extension into a database that already has data -- both of them
+# an annoying afternoon. Starting with it costs nothing today.
+name: aiops-dev
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: aiops
+      POSTGRES_PASSWORD: aiops
+      POSTGRES_DB: aiops_dev
+      # Deterministic collation. Without this, text ordering and index behaviour
+      # can differ between your laptop and the server.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      - "127.0.0.1:5432:5432"   # loopback only: never expose Postgres on the LAN
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiops -d aiops_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
