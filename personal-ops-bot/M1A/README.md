@@ -10,15 +10,39 @@ database guard, health endpoints, and an echo CLI.
 
 ## Quickstart
 
+Requires [uv](https://docs.astral.sh/uv/) and Docker.
+
 ```bash
 cp .env.example .env
 make up        # start PostgreSQL
-make install   # install the package and dev tooling
+make install   # create .venv from uv.lock (exact pinned versions)
 make migrate   # create system_settings and stamp the database as 'dev'
 make cli       # an echo REPL, with boot checks
 make api       # http://127.0.0.1:8000/health
 make check     # lint + types + import contracts + tests
 ```
+
+No `source .venv/bin/activate` step: every target runs through
+`uv run --locked`, so `make test` uses the locked versions whether you run it
+here or CI runs it.
+
+## Dependencies
+
+`pyproject.toml` declares what we depend on, as ranges, and is the file you
+edit. `uv.lock` records the exact versions those ranges resolved to -- every
+transitive dependency, pinned and hashed -- and is committed.
+
+Ranges alone are not reproducible: `fastapi>=0.115` means a clone today and a
+clone next month can install different code from identical sources, so a build
+can break with no commit to blame. The lockfile is what makes "it works on my
+machine" a checkable claim.
+
+```bash
+make lock      # re-resolve after editing dependencies; commit the result
+```
+
+`--locked` on every target means a stale `uv.lock` fails the build instead of
+being silently re-resolved.
 
 ## Layout
 
