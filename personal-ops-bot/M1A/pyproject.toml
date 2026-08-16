@@ -133,6 +133,19 @@ type = "forbidden"
 source_modules = ["app.db"]
 forbidden_modules = ["app.config"]
 
+# The layers contract above puts config and observability in the same layer,
+# which says they are siblings but does not state the direction that matters.
+# `configure_logging(level=..., json_output=...)` takes primitives on purpose,
+# so that a worker, a migration or a one-off script can set up logging without
+# constructing Settings. The moment observability imports config that property
+# is gone, and it would go quietly -- nothing would fail, the coupling would
+# just exist. This states the rule the module was written to satisfy.
+[[tool.importlinter.contracts]]
+name = "observability never reads settings; it takes primitives"
+type = "forbidden"
+source_modules = ["app.observability"]
+forbidden_modules = ["app.config"]
+
 [[tool.importlinter.contracts]]
 name = "core is pure: no frameworks, no drivers, no I/O libraries"
 type = "forbidden"
