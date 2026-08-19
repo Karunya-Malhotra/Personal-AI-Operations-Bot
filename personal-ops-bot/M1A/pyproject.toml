@@ -126,6 +126,7 @@ type = "layers"
 layers = [
     "app.main : app.cli : app.bootstrap",
     "app.api",
+    "app.domains",
     "app.db",
     "app.config : app.observability",
     "app.core",

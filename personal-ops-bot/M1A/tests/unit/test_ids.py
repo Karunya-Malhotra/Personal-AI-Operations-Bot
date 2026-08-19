@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 
 import pytest
 
@@ -44,6 +45,32 @@ def test_ids_sort_chronologically() -> None:
 
 
 def test_ids_are_unique_within_the_same_millisecond() -> None:
-    """Ordering comes from the clock; uniqueness must come from the entropy."""
+    """Ordering comes from the counter; uniqueness must come from the entropy."""
     values = {uuid7(AT) for _ in range(2000)}
     assert len(values) == 2000
+
+
+def test_ids_in_the_same_millisecond_are_still_strictly_ordered() -> None:
+    """The regression this guards is subtle and was measured, not theorised.
+
+    With `rand_a` filled randomly, ~52% of consecutive same-millisecond pairs
+    sorted in the wrong order. Message ordering is `(sent_at, id)`, so under a
+    FrozenClock -- where every row shares a timestamp -- a user turn and the
+    assistant's reply could be replayed to the model inverted.
+    """
+    # Its own millisecond: the counter is process-global, so sharing `AT` with
+    # another test would start this burst mid-range and saturate it early.
+    at = AT + timedelta(seconds=11)
+    values = [uuid7(at) for _ in range(3000)]
+    assert all(a < b for a, b in pairwise(values))
+
+
+def test_ordering_holds_across_a_millisecond_boundary() -> None:
+    """The counter reseeds when the millisecond changes, so this checks the
+    timestamp bits still dominate the ordering."""
+    clock = FrozenClock(AT + timedelta(seconds=22))
+    values = []
+    for _ in range(50):
+        values.append(uuid7(clock.now()))
+        clock.advance(timedelta(milliseconds=1))
+    assert all(a < b for a, b in pairwise(values))
