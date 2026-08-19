@@ -25,7 +25,10 @@ branch on gets a closed set and a constraint that keeps the database honest.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
+from uuid import UUID
 
 
 class Role(StrEnum):
@@ -39,3 +42,25 @@ class Role(StrEnum):
 #: M1B builds the system instruction at request time rather than storing it --
 #: see app/agent/context_builder.py for why.
 PERSISTABLE_ROLES = frozenset(Role)
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationMessage:
+    """One stored turn, as the rest of the application sees it.
+
+    Deliberately not the SQLAlchemy model. Two reasons, both practical rather
+    than purist:
+
+    1. The context builder and the Agent Runtime run *after* the database
+       session that loaded the history has closed. Handing them ORM instances
+       invites `DetachedInstanceError` and accidental lazy loads at exactly the
+       moment we are trying to be deterministic about what went into a prompt.
+    2. `app.core` may not import SQLAlchemy (an import-linter contract enforces
+       it), and this is the type the core-level context builder speaks. Mapping
+       at the repository boundary is a few lines and keeps that boundary real.
+    """
+
+    id: UUID
+    role: Role
+    content: str
+    sent_at: datetime
