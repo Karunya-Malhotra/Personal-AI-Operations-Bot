@@ -44,6 +44,23 @@ make lock      # re-resolve after editing dependencies; commit the result
 `--locked` on every target means a stale `uv.lock` fails the build instead of
 being silently re-resolved.
 
+## Tests
+
+```bash
+make test      # unit tests always; integration tests need a real PostgreSQL
+```
+
+Integration tests get their database one of two ways. By default they start one
+with testcontainers, which needs Docker. If Docker is unavailable -- or you
+already have a server running -- point them at it instead:
+
+```bash
+AIOPS_TEST_DATABASE_URL="postgresql+asyncpg://aiops:aiops@127.0.0.1:5432/postgres" make test
+```
+
+Either way each test module gets a freshly created, empty database, because
+some tests assert on what a database looks like *before* migrations run.
+
 ## Layout
 
 ```

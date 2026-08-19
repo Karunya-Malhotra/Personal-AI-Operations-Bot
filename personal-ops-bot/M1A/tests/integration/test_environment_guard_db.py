@@ -19,11 +19,7 @@ from app.db.guard import assert_database_environment, read_stamp
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture(scope="module")
-def postgres_dsn() -> str:
-    testcontainers = pytest.importorskip("testcontainers.postgres")
-    with testcontainers.PostgresContainer("pgvector/pgvector:pg16") as pg:
-        yield pg.get_connection_url().replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+# `postgres_dsn` (a freshly created, empty database) comes from tests/conftest.py.
 
 
 async def test_missing_table_reads_as_no_stamp(postgres_dsn: str) -> None:
