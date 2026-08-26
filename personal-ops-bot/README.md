@@ -26,6 +26,20 @@ No `source .venv/bin/activate` step: every target runs through
 `uv run --locked`, so `make test` uses the locked versions whether you run it
 here or CI runs it.
 
+## Language model
+
+`LLM_PROVIDER` selects the adapter: `anthropic`, `gemini`, or `fake`. Only the
+selected provider's key is read, and startup fails with a clear message if it is
+missing.
+
+`fake` is the default and is a first-class mode, not a test-only hack: it runs
+the whole application against a scripted model with no key, no network and no
+cost. Start there.
+
+Switching vendors is an `.env` edit. Nothing above `app/providers/llm/` knows
+which one answered -- an import contract enforces that no module outside that
+package may import a vendor SDK.
+
 ## Dependencies
 
 `pyproject.toml` declares what we depend on, as ranges, and is the file you

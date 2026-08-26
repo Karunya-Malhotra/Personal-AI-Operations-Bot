@@ -17,6 +17,10 @@ dependencies = [
     "alembic>=1.14",
     "structlog>=24.4",
     "typer>=0.15",
+    # LLM provider SDKs. Confined to app/providers/llm/ by an import contract --
+    # nothing above that boundary may import either one.
+    "anthropic>=0.40",
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -177,6 +181,33 @@ type = "forbidden"
 source_modules = ["app.providers"]
 forbidden_modules = ["app.db", "app.config"]
 
+# The substitution promise in app/core/llm.py, made checkable. Every layer that
+# is not the provider package is forbidden from importing a vendor SDK, so
+# "nothing above this line ever saw an Anthropic type" is enforced rather than
+# merely intended -- which is what makes swapping or adding a provider a new
+# file plus a config value.
+#
+# `allow_indirect_imports` is deliberate: bootstrap imports the factory, and the
+# factory imports an adapter, which imports its SDK. That chain is the boundary
+# working correctly. What must never happen is a *direct* import outside the
+# provider package, which is exactly what this catches.
+[[tool.importlinter.contracts]]
+name = "vendor SDKs stay behind the provider boundary"
+type = "forbidden"
+source_modules = [
+    "app.core",
+    "app.config",
+    "app.observability",
+    "app.db",
+    "app.domains",
+    "app.api",
+    "app.bootstrap",
+    "app.cli",
+    "app.main",
+]
+forbidden_modules = ["anthropic", "google"]
+allow_indirect_imports = true
+
 [[tool.importlinter.contracts]]
 name = "core is pure: no frameworks, no drivers, no I/O libraries"
 type = "forbidden"
@@ -189,4 +220,6 @@ forbidden_modules = [
     "structlog",
     "typer",
     "pydantic_settings",
+    "anthropic",
+    "google",
 ]

@@ -15,6 +15,7 @@ from app.config.settings import Settings
 from app.core.clock import FrozenClock
 from app.core.environment import Environment
 from app.main import create_app
+from app.providers.llm import FakeLLM
 
 
 class _BrokenEngine:
@@ -35,6 +36,9 @@ def app_with_broken_db(clean_env: None) -> Any:
         engine=_BrokenEngine(),  # type: ignore[arg-type]
         session_factory=None,  # type: ignore[arg-type]
         clock=FrozenClock(datetime(2026, 8, 14, tzinfo=UTC)),
+        # The health routes never call the model; a scripted provider keeps the
+        # container constructible without a key or a network.
+        llm=FakeLLM(),
     )
     app = create_app(container)
 
