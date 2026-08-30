@@ -130,6 +130,11 @@ type = "layers"
 layers = [
     "app.main : app.cli : app.bootstrap",
     "app.api",
+    # The Agent Runtime orchestrates a turn, so it sits above both the domain
+    # it reads (conversations) and the adapter it calls (providers). Nothing
+    # below it may reach back up -- a domain service that could start a run
+    # would mean turns were being orchestrated in two places.
+    "app.agent",
     "app.domains : app.providers",
     "app.db",
     "app.config : app.observability",
@@ -200,6 +205,7 @@ source_modules = [
     "app.observability",
     "app.db",
     "app.domains",
+    "app.agent",
     "app.api",
     "app.bootstrap",
     "app.cli",

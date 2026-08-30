@@ -86,6 +86,21 @@ class Settings(BaseSettings):
         default=None, description="Required when llm_provider=gemini."
     )
 
+    # --- agent runtime ------------------------------------------------------
+    #: How many past turns are replayed into a prompt. §22: the context window
+    #: is not infinite and this is the rule that keeps it bounded -- the most
+    #: recent N messages, with the number of dropped ones recorded in the trace
+    #: rather than silently discarded.
+    context_window_messages: int = Field(default=40, ge=2, le=500)
+    #: Attempts per turn, including the first. ARCHITECTURE §5.2 sends 429/5xx/
+    #: timeout to MODEL_RETRY_WAIT; this bounds how often that loop may run.
+    llm_max_attempts: int = Field(default=3, ge=1, le=10)
+    #: Base seconds for exponential backoff between attempts.
+    llm_retry_base_delay_s: float = Field(default=1.0, ge=0)
+    #: A run still non-terminal after this long is presumed orphaned by a crash
+    #: and swept to FAILED at startup (§5.3).
+    orphan_run_after_s: float = Field(default=300.0, gt=0)
+
     # --- api --------------------------------------------------------------
     api_host: str = Field(default="127.0.0.1")
     api_port: int = Field(default=8000, ge=1, le=65535)

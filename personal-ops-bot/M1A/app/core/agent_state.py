@@ -54,7 +54,12 @@ OBSERVABILITY_STATES = frozenset(RunState) - DURABLE_STATES
 
 #: The legal edges. Read this as the M1B slice of the §5.2 diagram.
 TRANSITIONS: dict[RunState, frozenset[RunState]] = {
-    RunState.RECEIVED: frozenset({RunState.CONTEXT_BUILDING}),
+    # FAILED is reachable from RECEIVED only because of the reaper: a process
+    # can die in any state, including before it does anything, and the sweep
+    # must be able to finalise whatever it finds. Without this edge a run
+    # orphaned in RECEIVED could never be closed, and would sit in the reaper's
+    # index forever. Found by writing the reaper, not by reading the diagram.
+    RunState.RECEIVED: frozenset({RunState.CONTEXT_BUILDING, RunState.FAILED}),
     RunState.CONTEXT_BUILDING: frozenset({RunState.MODEL_CALLING, RunState.FAILED}),
     RunState.MODEL_CALLING: frozenset(
         {
