@@ -102,3 +102,47 @@ async def postgres_dsn(postgres_server_dsn: str) -> Iterator[str]:
             await conn.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
     finally:
         await admin.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Container construction for tests.
+#
+# Building a `Container` field-by-field in each test means every new field
+# breaks every such test -- which happened twice while M1B was being built
+# (adding `llm`, then `runtime`). This helper takes the defaults and lets a test
+# override only what it actually cares about, so the next field addition is a
+# one-line change here rather than a sweep through the suite.
+# ---------------------------------------------------------------------------
+
+
+def make_container(**overrides: object):
+    """A `Container` with inert defaults. Override only what the test exercises."""
+    from datetime import UTC, datetime
+
+    from app.agent.runtime import AgentRuntime
+    from app.bootstrap import Container
+    from app.core.clock import FrozenClock
+    from app.providers.llm.fake import FakeLLM
+
+    clock = overrides.pop("clock", None) or FrozenClock(datetime(2026, 8, 19, tzinfo=UTC))
+    llm = overrides.pop("llm", None) or FakeLLM()
+    settings = overrides.pop("settings", None) or Settings(_env_file=None)
+    session_factory = overrides.pop("session_factory", None)
+    engine = overrides.pop("engine", None)
+
+    defaults: dict[str, object] = {
+        "settings": settings,
+        "engine": engine,
+        "session_factory": session_factory,
+        "clock": clock,
+        "llm": llm,
+        "runtime": AgentRuntime(
+            session_factory=session_factory,  # type: ignore[arg-type]
+            llm=llm,  # type: ignore[arg-type]
+            clock=clock,  # type: ignore[arg-type]
+            model="fake-model-1",
+            max_tokens=256,
+        ),
+    }
+    defaults.update(overrides)
+    return Container(**defaults)  # type: ignore[arg-type]

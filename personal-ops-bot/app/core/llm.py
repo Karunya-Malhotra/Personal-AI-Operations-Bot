@@ -172,6 +172,10 @@ class LLMRateLimited(LLMError):
 
     retryable = True
 
+    #: Seconds the provider asked us to wait, when it said. Annotated at class
+    #: level so the runtime's `is not None` check actually narrows the type.
+    retry_after_s: float | None
+
     def __init__(
         self, message: str, *, provider: str | None = None, retry_after_s: float | None = None
     ) -> None:
