@@ -4,9 +4,36 @@ A personal AI assistant whose interface is chat and whose system of record is
 PostgreSQL. See `docs/ARCHITECTURE.md` for the design and `docs/adr/` for the
 decisions behind it.
 
-**Current milestone: M1A — Foundation.** No agent, no tools, no LLM yet.
-What works: configuration, structured logging, migrations, the dev/prod
-database guard, health endpoints, and an echo CLI.
+**Current milestone: M1B — Conversation core.** A persistent, traceable
+conversation with a real LLM behind a provider boundary. No tools yet.
+
+What works: everything from M1A (configuration, structured logging, migrations,
+the dev/prod database guard, health endpoints), plus persisted conversations and
+messages, an `LLMProvider` abstraction with Anthropic, Gemini and scripted
+adapters selected by config, the Agent Runtime state machine with `agent_runs` /
+`llm_calls` tracing and correlation ids, a startup sweep for runs a crash left in
+flight, and a CLI that holds a conversation across restarts.
+
+**What M1B deliberately does not do.** These are M1C and later, and none of them
+are stubbed or partially present -- a capability the system does not have should
+not appear to exist:
+
+| Deferred | Arrives |
+|---|---|
+| Tool calling, the tool registry | M1C |
+| The policy engine and provenance propagation | M1C |
+| Confirmations (durable suspend/resume of a turn) | M1D |
+| Telegram, WhatsApp | M1E / M7 |
+| Memory extraction, embeddings, semantic retrieval | M4 |
+| Background jobs, scheduling, workflows | M2 / M3 |
+| Web research and scraping | M6 |
+| Media processing | M5 |
+| Proactive behaviour | M2+ |
+
+Two limits worth knowing inside M1B itself: the context window counts
+*messages*, not tokens (a token-aware budget needs a per-provider tokeniser and
+lands with M4), and the reaper closes an interrupted turn rather than resuming
+it -- resumption needs the M1D confirmation machinery.
 
 ## Quickstart
 
@@ -83,9 +110,16 @@ app/config/         Settings (pydantic-settings). Read only by bootstrap.
 app/observability/  structlog setup, correlation ids, redaction.
 app/db/             engine, session scope, models, environment guard.
 app/api/            FastAPI routers.
+app/domains/        business logic. No LLM, no prompts. (conversations)
+app/providers/llm/  outward adapters: anthropic, gemini, fake, pricing, factory.
+app/agent/          the Agent Runtime: state machine, context builder, reaper.
 app/bootstrap.py    composition root; boot-time invariants.
 app/main.py         api entrypoint.
 app/cli.py          cli entrypoint.
 ```
 
-Dependencies point inward only. `lint-imports` enforces it in CI.
+Dependencies point inward only, and `lint-imports` enforces it -- seven
+contracts, each verified to actually fail when violated rather than assumed to
+bind. The load-bearing ones: `domains` and `providers` are independent, no
+module outside `app/providers/llm/` may import a vendor SDK, and `core` stays
+free of frameworks and drivers.
