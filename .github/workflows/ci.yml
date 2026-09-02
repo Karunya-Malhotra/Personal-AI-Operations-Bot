@@ -49,11 +49,14 @@ jobs:
         env:
           POSTGRES_USER: aiops
           POSTGRES_PASSWORD: aiops
-          POSTGRES_DB: aiops_ci
+          # `postgres` rather than a project-specific name: the tests connect
+          # here only to CREATE DATABASE for each module (tests/conftest.py), so
+          # the maintenance database is the right target and always exists.
+          POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U aiops"
+          --health-cmd "pg_isready -U aiops -d postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
