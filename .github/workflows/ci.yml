@@ -1,0 +1,101 @@
+# The gate that `make check` runs locally, run again on every push and PR.
+#
+# Two properties this is built around:
+#
+# 1. **CI runs the Makefile, not a copy of it.** Each step below calls a `make`
+#    target rather than spelling out the ruff/mypy/pytest invocation. A CI file
+#    that restated those commands would drift from the Makefile the first time
+#    one changed, and the drift would be invisible until "green in CI, broken
+#    locally" (or worse, the reverse). Separate steps rather than a single
+#    `make check` only so a failure names itself in the GitHub UI.
+#
+# 2. **The dependency set is the locked one.** Every make target runs through
+#    `uv run --locked`, so a `uv.lock` that has drifted from `pyproject.toml`
+#    fails here rather than being silently re-resolved into a different build
+#    than the one that was reviewed.
+#
+# The project lives in a subdirectory, but workflows are only read from the
+# repository root, hence the `working-directory` default.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A new push supersedes the run in flight for the same ref. Without this a
+# branch pushed three times queues three full runs and reports the oldest last.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: personal-ops-bot/M1A
+
+jobs:
+  check:
+    name: lint, types, contracts, tests
+    runs-on: ubuntu-latest
+
+    services:
+      # The same image as docker/compose.dev.yml, deliberately: pgvector rather
+      # than plain postgres, so the environment CI proves green is the one
+      # developers run -- and so M4's vector work does not arrive to find CI
+      # using an image without the extension.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: aiops
+          POSTGRES_PASSWORD: aiops
+          POSTGRES_DB: aiops_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aiops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_ENV: dev
+      # Integration tests create a throwaway database per module on this server
+      # (see tests/conftest.py). Pointing them at a service container rather
+      # than letting testcontainers start one is faster, and it means the suite
+      # does not depend on Docker-in-Docker being available to the runner.
+      AIOPS_TEST_DATABASE_URL: postgresql+asyncpg://aiops:aiops@localhost:5432/postgres
+      # No provider keys are set, on purpose. The live provider tests skip
+      # without them, and CI must never need a credential to go green.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        # The official installer rather than a marketplace action: it pins no
+        # third-party action version, and `uv` then pins everything else.
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('personal-ops-bot/M1A/uv.lock') }}
+          restore-keys: uv-${{ runner.os }}-
+
+      - name: Install the locked dependency set
+        run: make install
+
+      - name: Lint
+        run: make lint
+
+      - name: Types
+        run: make typecheck
+
+      - name: Architecture contracts
+        run: make contracts
+
+      - name: Tests
+        run: make test
