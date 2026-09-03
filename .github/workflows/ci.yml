@@ -15,7 +15,8 @@
 #    than the one that was reviewed.
 #
 # The project lives in a subdirectory, but workflows are only read from the
-# repository root, hence the `working-directory` default.
+# repository root, hence the `working-directory` default. That path moved when
+# M1A/ was dissolved; it is the one thing here that must track the layout.
 
 name: CI
 
@@ -32,7 +33,7 @@ concurrency:
 
 defaults:
   run:
-    working-directory: personal-ops-bot/M1A
+    working-directory: personal-ops-bot
 
 jobs:
   check:
