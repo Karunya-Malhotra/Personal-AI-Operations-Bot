@@ -6,6 +6,19 @@ a migration that silently drops its table.
 """
 
 from app.db.base import Base
+from app.db.models.agent_run import AgentRun
+from app.db.models.conversation import Conversation, Message
+from app.db.models.llm_call import LlmCall
 from app.db.models.system_setting import SystemSetting
+from app.db.models.user import Identity, User
 
-__all__ = ["Base", "SystemSetting"]
+__all__ = [
+    "AgentRun",
+    "Base",
+    "Conversation",
+    "Identity",
+    "LlmCall",
+    "Message",
+    "SystemSetting",
+    "User",
+]

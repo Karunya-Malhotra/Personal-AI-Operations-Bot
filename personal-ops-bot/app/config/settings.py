@@ -63,6 +63,44 @@ class Settings(BaseSettings):
         description="JSON logs. Defaults to True in prod, False in dev (human-readable).",
     )
 
+    # --- llm ---------------------------------------------------------------
+    llm_provider: str = Field(
+        default="anthropic",
+        description="Which adapter to construct. See app/providers/llm/factory.py.",
+    )
+    llm_model: str = Field(
+        default="claude-opus-5",
+        description=(
+            "Model id, passed straight through to the provider. The default is an "
+            "Anthropic model; switching LLM_PROVIDER to gemini requires setting this "
+            "too, since the id vocabularies are unrelated."
+        ),
+    )
+    llm_max_tokens: int = Field(default=4096, ge=1, le=200_000)
+    llm_timeout_s: float = Field(default=30.0, gt=0)
+
+    anthropic_api_key: SecretStr | None = Field(
+        default=None, description="Required when llm_provider=anthropic."
+    )
+    gemini_api_key: SecretStr | None = Field(
+        default=None, description="Required when llm_provider=gemini."
+    )
+
+    # --- agent runtime ------------------------------------------------------
+    #: How many past turns are replayed into a prompt. §22: the context window
+    #: is not infinite and this is the rule that keeps it bounded -- the most
+    #: recent N messages, with the number of dropped ones recorded in the trace
+    #: rather than silently discarded.
+    context_window_messages: int = Field(default=40, ge=2, le=500)
+    #: Attempts per turn, including the first. ARCHITECTURE §5.2 sends 429/5xx/
+    #: timeout to MODEL_RETRY_WAIT; this bounds how often that loop may run.
+    llm_max_attempts: int = Field(default=3, ge=1, le=10)
+    #: Base seconds for exponential backoff between attempts.
+    llm_retry_base_delay_s: float = Field(default=1.0, ge=0)
+    #: A run still non-terminal after this long is presumed orphaned by a crash
+    #: and swept to FAILED at startup (§5.3).
+    orphan_run_after_s: float = Field(default=300.0, gt=0)
+
     # --- api --------------------------------------------------------------
     api_host: str = Field(default="127.0.0.1")
     api_port: int = Field(default=8000, ge=1, le=65535)
@@ -75,6 +113,21 @@ class Settings(BaseSettings):
         if upper not in allowed:
             raise ValueError(f"log_level must be one of {sorted(allowed)}, got {v!r}")
         return upper
+
+    @field_validator("llm_provider")
+    @classmethod
+    def _known_provider(cls, v: str) -> str:
+        """Fail at startup on a typo rather than at the first model call.
+
+        The set is duplicated from the factory rather than imported, because
+        `config` must not depend on `providers` -- an import-linter contract
+        enforces that direction. A unit test asserts the two stay in agreement,
+        which is the same enum-vs-CHECK-constraint pattern v0.3.1 §E.2 uses.
+        """
+        allowed = {"anthropic", "gemini", "fake"}
+        if v not in allowed:
+            raise ValueError(f"llm_provider must be one of {sorted(allowed)}, got {v!r}")
+        return v
 
     @property
     def is_prod(self) -> bool:

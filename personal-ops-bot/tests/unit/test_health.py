@@ -10,11 +10,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.bootstrap import Container
 from app.config.settings import Settings
 from app.core.clock import FrozenClock
 from app.core.environment import Environment
 from app.main import create_app
+from tests.conftest import make_container
 
 
 class _BrokenEngine:
@@ -30,10 +30,9 @@ class _BrokenEngine:
 @pytest.fixture
 def app_with_broken_db(clean_env: None) -> Any:
     settings = Settings(app_env=Environment.DEV)
-    container = Container(
+    container = make_container(
         settings=settings,
-        engine=_BrokenEngine(),  # type: ignore[arg-type]
-        session_factory=None,  # type: ignore[arg-type]
+        engine=_BrokenEngine(),
         clock=FrozenClock(datetime(2026, 8, 14, tzinfo=UTC)),
     )
     app = create_app(container)
